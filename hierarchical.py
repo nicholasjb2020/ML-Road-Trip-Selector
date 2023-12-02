@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.cluster.hierarchy import dendrogram, linkage
 from sklearn.cluster import AgglomerativeClustering
 
-df = pd.read_csv('CS4260/data_files/new_data.csv')
+df = pd.read_csv('data_files/new_data.csv')
 lol = []
 lol.append(df['t0'].tolist())
 lol.append(df['t1'].tolist())
