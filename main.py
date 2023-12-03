@@ -61,24 +61,31 @@ def train_network(training_data):
 
     return model
 
-def classify_user_preferences(model, user_preferences):
+def classify_user_preferences(model, user_preferences, k=1):
     """
-    Classify user preferences using the trained model.
+    Classify user preferences using the trained model and return the k-th best predicted theme.
 
     Parameters:
     - model: The trained Keras model.
     - user_preferences: A list of length 10 representing user preferences.
+    - k: The position of the predicted theme to return (default is 1).
 
     Returns:
-    - predicted_theme: The predicted theme based on the model.
+    - kth_best_theme: The k-th best predicted theme based on the model.
     """
     user_input = np.array(user_preferences).reshape(1, -1)
     predictions = model.predict(user_input)
 
-    predicted_class_index = np.argmax(predictions)
-    predicted_theme = theme_names[predicted_class_index]
+    # Get the indices of the predicted classes sorted in descending order
+    sorted_indices = np.argsort(predictions[0])[::-1]
 
-    return predicted_theme
+    # Get the k-th best index
+    kth_best_index = sorted_indices[k - 1]
+
+    # Map the index to the corresponding theme name
+    kth_best_theme = theme_names[kth_best_index]
+
+    return kth_best_theme
 
 def get_random_input_from_cluster(predicted_theme, training_data):
     """
