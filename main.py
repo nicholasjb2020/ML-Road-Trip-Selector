@@ -12,11 +12,12 @@ import random
 theme_names = ['Space', 'Wildlife', 'Festivals', 'History', 'Museums', 'Romantic', 'Nightlife', 'Architecture', 'Art', 'Shopping']
 
 def get_user_input():
-    # user_preferences = []
-    # print('Please rate on a scale of 1-10, how much you enjoy the following theme.\n')
-    # for i in range(0, 10):
-    #    user_preferences.append(float(input(f'{theme_names[i]}:')))
-    return [1, 7, 2, 9, 6, 8, 5, 5, 2, 9]
+    user_preferences = []
+    print('Please rate on a scale of 1-10, how much you enjoy the following theme.\n')
+    for i in range(0, 10):
+       user_preferences.append(float(input(f'{theme_names[i]}:')))
+    print('Recommending you a new road trip...\n')
+    return user_preferences
 
 def evaluate_model(model, X, Y, k=5):
     """
@@ -67,7 +68,7 @@ def evaluate_model(model, X, Y, k=5):
         history = model2.fit(train_X, Y_one_hot[train],
                              batch_size=8,
                              epochs=100,
-                             verbose=1)
+                             verbose=0)
         # Save model trained on each fold.
 
         # Evaluate the model - report accuracy and capture it into a list for future reporting
@@ -80,65 +81,46 @@ def evaluate_model(model, X, Y, k=5):
     print(f'Mean Accuracy across {k} folds: {mean_accuracy:.2f}%')
 
 
-def train_network(training_data, epochs=100, batch_size=8):
-    X = training_data.iloc[:, 1:]
-    y = training_data.iloc[:, 0]
+def train_network(data):
+    # Assuming data is a NumPy array where the first column is the target variable
+    X = data.iloc[:, 1:]
+    y = data.iloc[:, 0]
 
-    # Step 1: Label Encoding
-    label_encoder = LabelEncoder()
-    y_encoded = label_encoder.fit_transform(y)
-    y_one_hot = to_categorical(y_encoded)
+    # Convert target variable to one-hot encoding
+    y_one_hot = to_categorical(y, num_classes=390)
 
-    # Step 2: Build the model
     model = Sequential()
-    model.add(Dense(units=390, input_dim=10, activation='relu'))
+    model.add(Dense(units=390, input_dim=X.shape[1], activation='relu'))
     model.add(Dense(units=50, activation='relu'))
     model.add(Dense(units=75, activation='relu'))
     model.add(Dense(units=390, activation='softmax'))
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Output layer should have the correct number of units based on the number of classes
-    num_classes = len(label_encoder.classes_)
-    model.add(Dense(units=num_classes, activation='softmax'))
+    # Train the model on the whole dataset
+    model.fit(X, y_one_hot, epochs=25, batch_size=32, verbose=0)
 
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    return model
 
-    # Step 3: Train the model
-    model.fit(X, y_one_hot, epochs=epochs, batch_size=batch_size, verbose=0)
-
-    # Step 4: Return the trained model and label encoder
-    return model, label_encoder
-
-
-def classify_user_preferences(model, user_preferences, label_encoder, k=1):
+def classify_user_preferences(model, user_pref):
     """
-    Classify user preferences using the trained model and return the k-th best predicted theme.
+    Classify user preferences using the trained model.
 
     Parameters:
     - model: The trained Keras model.
-    - user_preferences: A list of length 10 representing user preferences.
-    - label_encoder: The label encoder used for encoding classes.
-    - k: The position of the predicted theme to return (default is 1).
+    - user_pref: A list of length 10 representing user preferences.
 
     Returns:
-    - kth_best_theme: The k-th best predicted theme based on the model.
+    - predicted_class: The predicted class based on the model.
     """
-    user_input = np.array(user_preferences).reshape(1, -1)
+    user_input = np.array(user_pref).reshape(1, -1)
     predictions = model.predict(user_input)
 
-    # Get the indices of the predicted classes sorted in descending order
-    sorted_indices = np.argsort(predictions[0])[::-1]
+    predicted_class = np.argmax(predictions)
 
-    # Get the k-th best index
-    kth_best_index = sorted_indices[k - 1]
-
-    # Decode the label using the label encoder
-    kth_best_theme = label_encoder.classes_[kth_best_index]
-
-    return kth_best_theme
+    return predicted_class
 
 
-def get_random_input_from_cluster(predicted_theme, training_data):
+def get_random_input_from_cluster(predicted_theme, training_data, k=0):
     """
     Get a random input from the training data with the predicted theme as its target.
 
@@ -152,16 +134,18 @@ def get_random_input_from_cluster(predicted_theme, training_data):
     # Filter training data based on the predicted theme
     cluster_data = training_data[training_data['utility'] == predicted_theme]
 
-    # Get a random row from the filtered data
-    random_input = cluster_data.sample(n=1, random_state=42)
+    trip_from_cluster = cluster_data.iloc[k]
+    return trip_from_cluster.iloc[1:]
 
-    # Remove the target column (assuming 'target_column' is the name of your target column)
-    random_input = random_input.drop('utility', axis=1)
+def prediction_output(predicted_class, data):
+    print("We recommend a road trip with the following feature scores:")
+    road_trip = get_random_input_from_cluster(predicted_class, data)
+    for theme, pred in zip(theme_names, road_trip):
+        print(f'{theme}: {pred}')
 
-    return random_input
 
 data = pd.read_csv('data_files/clustered_data.csv')
 user_pref = get_user_input()
-model, encoder = train_network(data)
-prediction = classify_user_preferences(model, user_pref, encoder)
-print(get_random_input_from_cluster(prediction, data))
+model = train_network(data)
+predicted_class = classify_user_preferences(model, user_pref)
+prediction_output(predicted_class, data)
