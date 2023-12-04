@@ -1,78 +1,76 @@
 import pandas as pd
 from keras.models import Sequential
 from keras.layers import Dense
-from keras.utils import to_categorical, split_dataset
+from keras.utils import to_categorical
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler, LabelEncoder, OneHotEncoder
-from scikeras.wrappers import KerasClassifier
-from sklearn.model_selection import cross_val_score
 import numpy as np
-import random
 
 theme_names = ['Space', 'Wildlife', 'Festivals', 'History', 'Museums', 'Romantic', 'Nightlife', 'Architecture', 'Art', 'Shopping']
 
 def get_user_input():
+    """
+    Get user preferences for road trip themes.
+
+    This function prompts the user to rate their enjoyment of each road trip theme on a scale of 1 to 10. The user is
+    asked to input a numerical rating for each theme, and the preferences are stored in a list.
+
+    Returns:
+    - user_preferences: A list containing user ratings for each road trip theme.
+    """
     user_preferences = []
     print('Please rate on a scale of 1-10, how much you enjoy the following theme.\n')
+
     for i in range(0, 10):
-       user_preferences.append(float(input(f'{theme_names[i]}:')))
+        user_preferences.append(float(input(f'{theme_names[i]}:')))
+
     print('Recommending you a new road trip...\n')
     return user_preferences
 
-def evaluate_model(model, X, Y, k=5):
+
+
+def evaluate_model(data, k=10):
     """
-    Evaluate the accuracy of a model using k-fold cross-validation.
+    Evaluate a neural network model using k-fold cross-validation.
 
     Parameters:
-    - model: The Keras model to be evaluated.
-    - X: The input data.
-    - y: The true labels.
-    - k: The number of folds for cross-validation (default is 5).
+    - data: A Pandas DataFrame containing the target variable in the first column and features in the remaining columns.
+    - k: The number of folds for cross-validation (default is 10).
 
-    Returns:
-    - mean_accuracy: The mean accuracy over k folds.
+    This function performs k-fold cross-validation on a neural network model using the specified data. The input data is
+    assumed to have a structure where the first column represents the target variable, and the rest of the columns
+    represent features.
+
+    The training is performed on each fold separately, and the mean accuracy across all folds is reported.
+
     """
-    label_encoder = LabelEncoder()
-    Y_encoded = label_encoder.fit_transform(Y)
-    Y_one_hot = to_categorical(Y_encoded)
+    X = data.iloc[:, 1:]
+    Y = data.iloc[:, 0]
+    Y_one_hot = to_categorical(Y, num_classes=390)
 
-
-    cv = KFold(n_splits=10, shuffle=True, random_state=42)
+    # K-fold cross-validation setup
+    cv = KFold(n_splits=k, shuffle=True, random_state=42)
     fold_no = 1
     acc_per_fold = []  # save accuracy from each fold
     X_array = X.to_numpy()
 
+    print('Performing cross-validation...\n')
     for train, test in cv.split(X_array, Y):
-        print('   ')
-        print(f'Training for fold {fold_no} ...')
-
-        # Scale data
-        scaler = MinMaxScaler()
         train_X = X_array[train]
         test_X = X_array[test]
-        scaler.fit(train_X)
-        train_X = scaler.transform(train_X)
-        test_X = scaler.transform(test_X)
 
-        # Define the model - inside the loop so it trains from scratch for each fold
-        # If defined outside, each fold training starts at where it left off at the previous fold
-        # calling it as model2 instead of model to make sure no information from our
-        # previous example is carried over (without restarting the kernel)
-        model2 = Sequential()
-        model2.add(Dense(units=390, input_dim=10, activation='relu'))
-        model2.add(Dense(units=50, activation='relu'))
-        model2.add(Dense(units=75, activation='relu'))
-        model2.add(Dense(units=390, activation='softmax'))
-        model2.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        # Create a sequential neural network model
+        model = Sequential()
+        model.add(Dense(units=390, input_dim=10, activation='relu'))
+        model.add(Dense(units=50, activation='relu'))
+        model.add(Dense(units=75, activation='relu'))
+        model.add(Dense(units=390, activation='softmax'))
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
         # Fit data to model
-        history = model2.fit(train_X, Y_one_hot[train],
-                             batch_size=8,
-                             epochs=100,
-                             verbose=0)
-        # Save model trained on each fold.
+        model.fit(train_X, Y_one_hot[train], batch_size=8, epochs=100, verbose=0)
 
         # Evaluate the model - report accuracy and capture it into a list for future reporting
-        scores = model2.evaluate(test_X, Y_one_hot[test], verbose=0)
+        scores = model.evaluate(test_X, Y_one_hot[test], verbose=0)
         acc_per_fold.append(scores[1] * 100)
 
         fold_no = fold_no + 1
@@ -82,22 +80,55 @@ def evaluate_model(model, X, Y, k=5):
 
 
 def train_network(data):
-    # Assuming data is a NumPy array where the first column is the target variable
+    """
+    Train a neural network model using the specified data.
+
+    Parameters:
+    - data: A Pandas DataFrame containing the target variable in the first column and features in the remaining columns.
+
+    Returns:
+    - model: The trained Keras model.
+
+    This function assumes that the input data has a structure where the first column represents the target variable
+    and the rest of the columns represent features. The target variable is converted to one-hot encoding, and a neural
+    network model is created and trained using Keras.
+
+    The architecture of the neural network:
+    - Input layer with units equal to the number of features.
+    - Hidden layers with 390, 50, and 75 units, respectively, and ReLU activation.
+    - Output layer with units equal to the number of classes (390) and softmax activation for multi-class
+    classification.
+
+    The model is compiled with the Adam optimizer, categorical cross-entropy loss, and accuracy as the evaluation
+     metric.
+
+    The training is performed on the entire dataset for a specified number of epochs (default is 25) with a batch size
+     of 32.
+
+    Uncomment the line '#evaluate_model(data)' to perform k-fold cross-validation on the model.
+
+    """
     X = data.iloc[:, 1:]
     y = data.iloc[:, 0]
 
     # Convert target variable to one-hot encoding
     y_one_hot = to_categorical(y, num_classes=390)
 
+    # Create a sequential neural network model
     model = Sequential()
     model.add(Dense(units=390, input_dim=X.shape[1], activation='relu'))
     model.add(Dense(units=50, activation='relu'))
     model.add(Dense(units=75, activation='relu'))
     model.add(Dense(units=390, activation='softmax'))
+
+    # Compile the model
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Train the model on the whole dataset
     model.fit(X, y_one_hot, epochs=25, batch_size=32, verbose=0)
+
+    # Uncomment this line to perform k-fold cross-validation on the model
+    #evaluate_model(data)
 
     return model
 
@@ -120,28 +151,57 @@ def classify_user_preferences(model, user_pref):
     return predicted_class
 
 
-def get_random_input_from_cluster(predicted_theme, training_data, k=0):
+def get_trip_from_cluster(predicted_class, training_data, k=0):
     """
-    Get a random input from the training data with the predicted theme as its target.
+    Get an input from the training data with the predicted class as its target.
 
     Parameters:
-    - predicted_theme: The predicted theme based on the user preferences.
-    - training_data: The DataFrame containing the training data.
+    - predicted_theme (str): The predicted theme based on the user preferences.
+    - training_data (pd.DataFrame): The DataFrame containing the training data.
+    - k (int): The index of the road trip within the predicted theme class. Defaults to 0.
 
     Returns:
-    - random_input: A random input from the cluster with the predicted theme.
+    - pd.Series: An input from the class with the predicted theme.
+
+    If no more road trips are available in the cluster, an empty Series is returned.
     """
     # Filter training data based on the predicted theme
-    cluster_data = training_data[training_data['utility'] == predicted_theme]
+    cluster_data = training_data[training_data['utility'] == predicted_class]
 
-    trip_from_cluster = cluster_data.iloc[k]
-    return trip_from_cluster.iloc[1:]
+    if k >= cluster_data.shape[0]:  # no more road trips in this cluster
+        return pd.Series()
+    else:
+        trip_from_cluster = cluster_data.iloc[k]
+        return trip_from_cluster.iloc[1:]
+
 
 def prediction_output(predicted_class, data):
+    """
+    Print feature scores of recommended road trips for a predicted theme.
+
+    Parameters:
+    - predicted_class (str): The predicted theme based on user preferences.
+    - data (pd.DataFrame): The DataFrame containing the training data.
+
+    Prints:
+    - Feature scores for a recommended road trip, grouped by theme.
+
+    If there are no more road trip recommendations for the predicted theme, a message is printed,
+    and the function terminates. Users can choose to continue receiving recommendations or exit.
+
+    """
     print("We recommend a road trip with the following feature scores:")
-    road_trip = get_random_input_from_cluster(predicted_class, data)
-    for theme, pred in zip(theme_names, road_trip):
-        print(f'{theme}: {pred}')
+    k = 0
+    while True:
+        road_trip = get_trip_from_cluster(predicted_class, data, k)
+        if road_trip.empty:
+            print('No more road trip recommendations')
+            break
+        for theme, pred in zip(theme_names, road_trip):
+            print(f'{theme}: {pred}')
+        if (input("Do you want another road trip (y/n)") != 'y'):
+            break
+        k = k + 1
 
 
 data = pd.read_csv('data_files/clustered_data.csv')
