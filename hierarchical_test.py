@@ -17,8 +17,8 @@ max_silhouette_avg = 0
 best_n_clusters = 0
 labels = []
 
-# Iterate over a range of cluster numbers from 2 to 899
-for i in range(2, 900):
+# Iterate over a range of cluster numbers from 2 to 500
+for i in range(2, 501):
     # Create an Agglomerative Clustering model with current cluster number
     hierarchical_cluster = AgglomerativeClustering(n_clusters=i, affinity='euclidean', linkage='ward')
 
