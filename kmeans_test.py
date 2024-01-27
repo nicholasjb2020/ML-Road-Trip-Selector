@@ -15,7 +15,7 @@ best_n_clusters = 0
 labels = []
 
 # Iterate through a range of cluster numbers to find the optimal number of clusters
-for i in range(2, 900):
+for i in range(2, 501):
     # Create a KMeans clustering model with the current number of clusters
     kmeans = KMeans(n_clusters=i, random_state=2)
 
